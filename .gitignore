@@ -1,0 +1,17 @@
+# Secrets & local env (never commit)
+.env
+.env.*
+!.env.example
+!**/.env.example
+backend/.env
+frontend/.env
+*.pem
+*.key
+
+node_modules/
+frontend/node_modules/
+backend/data/
+*.db
+*.log
+frontend/dist/
+.DS_Store

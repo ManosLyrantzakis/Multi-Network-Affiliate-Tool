@@ -1,0 +1,13 @@
+{
+  "name": "affiliate-tool-node-vue",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n be,fe \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "dev:stable": "concurrently -n be,fe \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
