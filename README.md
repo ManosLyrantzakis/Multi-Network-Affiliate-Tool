@@ -1,96 +1,104 @@
-# Affiliate Merchant Tool
+# Multi-Network Affiliate Tool
 
-Εσωτερικό εργαλείο για **συγκέντρωση, συγχρονισμό και προβολή** affiliate δεδομένων από πολλαπλά δίκτυα (AWIN, CJ, Impact, Webgains) σε ένα dashboard. Αναπτύχθηκε για τις ανάγκες της **εταιρείας στην οποία εργάζομαι** (εσωτερική χρήση / portfolio).
+I built this application to **centralise affiliate operations** in one place: multiple advertiser networks, one data model, and a single UI for merchants, transactions, performance, and validation workflows. The stack is a **Vue 3** SPA on **Vite** talking to a **Node.js** **Express** API, with **SQLite** for persistence.
 
-**English (e.g. GitHub description):** Multi-network affiliate dashboard and sync tool (AWIN, CJ, Impact, Webgains) — **Node.js** API + **Vue** frontend. Fetches and normalizes transactions, performance reporting, and Webgains live KPIs; supports **manual sync** from the UI and **automated / scheduled** background sync when the backend worker and cron are configured.
+The system **pulls** transaction data from each network’s APIs (or hybrid flows where scraping is required), **normalises** records into a shared schema, and supports both **on-demand sync** from the dashboard and **scheduled** background jobs when cron is enabled.
 
-> **Σημαντικό:** Μην ανεβάζεις ποτέ secrets (`.env`, API keys, tokens). Το `.gitignore` αποκλείει `.env` και τη βάση· κράτα αντίγραφα ρυθμίσεων μόνο τοπικά ή σε ασφαλές password manager.
+**Repository:** [github.com/ManosLyrantzakis/Multi-Network-Affiliate-Tool](https://github.com/ManosLyrantzakis/Multi-Network-Affiliate-Tool)
 
 ---
 
-## Τι κάνει το tool
+## Capabilities
 
-- **Merchants:** Διαχείριση brands / λογαριασμών ανά δίκτυο (credentials αποθηκευμένα κρυπτογραφημένα στη SQLite).
-- **Sync:** Λήψη συναλλαγών (transactions) ανά merchant και χρονικό εύρος· κανονικοποίηση σε κοινό σχήμα στη βάση· **χειροκίνητο sync** από το UI και **αυτόματο / προγραμματισμένο** sync μέσω backend cron όταν είναι ρυθμισμένο.
-- **Dashboard / reports:** Προβολή performance, ημερήσια στατιστικά, publishers όπου υποστηρίζεται από το δίκτυο.
-- **Δίκτυα (integrations):**
-  - **AWIN** — REST API (Bearer token), transactions + performance όπου εφαρμόζεται.
-  - **Impact** — REST API (Account SID + Auth Token), actions / clicks όπου ρυθμισμένο.
-  - **CJ (Rakuten Advertising)** — REST / GraphQL όπου ρυθμισμένο + Playwright scraping όπου χρειάζεται.
-  - **Webgains** — Platform API (OAuth2 password grant + merchant/program IDs).
+| Area | Behaviour |
+|------|------------|
+| **Merchants** | CRUD for brands / accounts per network; API keys and secrets stored **encrypted** in SQLite via `SECRET_KEY`. |
+| **Sync** | Date-range transaction fetch per merchant; upsert into DB; aggregates for daily / publisher metrics where implemented. |
+| **Reporting** | Performance dashboards, daily breakdowns, publisher views, transaction lists, Webgains **live KPI** panel (Platform performance API). |
+| **Automation** | `node-cron` scheduler in the backend; optional **Playwright** for CJ flows that cannot be satisfied by REST alone. |
+
+### Network integrations
+
+- **AWIN** — REST (Bearer), transactions and performance where the API exposes them.
+- **Impact** — REST (Account SID + auth token), actions and reporting as configured.
+- **CJ (Rakuten Advertising)** — REST / GraphQL where available; Playwright for publisher / performance paths that need a browser.
+- **Webgains** — Platform API (OAuth2 password grant); merchant and program IDs; DKK-oriented reporting and optional `WEBGAINS_FORCE_ROW_CURRENCY` for consistent stored ISO codes after re-sync (see Environment).
 
 ---
 
 ## Tech stack
 
-| Επίπεδο | Τεχνολογία |
-|--------|------------|
-| **Frontend** | Vue 3 (Composition API), Vite, Pinia, Bootstrap 5, Chart.js / vue-chartjs |
-| **Backend** | Node.js 18+ (ES modules), Express |
-| **Βάση** | SQLite (`better-sqlite3`) — αρχείο DB κάτω από `backend/data/` (εξαιρείται από git) |
-| **Auth / sessions** | `express-session` + file-based session store |
-| **Automation** | `node-cron`, optional Playwright (Chromium) για CJ flows |
-| **Άλλα** | `dotenv`, `cors`, `csv-parse`, `fast-xml-parser` |
+| Layer | Choice |
+|--------|--------|
+| **UI** | Vue 3 (Composition API), Vite, Pinia, Bootstrap 5, Chart.js / vue-chartjs |
+| **API** | Node.js 18+ (ES modules), Express, REST JSON |
+| **Data** | SQLite via `better-sqlite3` — runtime DB under `backend/data/` (gitignored) |
+| **Sessions** | `express-session` with file-based store |
+| **Tooling** | `dotenv`, `cors`, `csv-parse`, `fast-xml-parser` |
 
-**Δομή monorepo (workspace):**
+---
+
+## Repository layout
 
 ```
 affiliate-tool-node-vue/
-├── package.json          # concurrently: τρέχει backend + frontend μαζί
-├── backend/              # Express API + fetchers + DB
-│   ├── server.js
-│   ├── config.js
-│   ├── fetchers/
-│   ├── db/
-│   └── .env              # δημιουργείται τοπικά — ΟΧΙ στο git
-└── frontend/             # Vue + Vite (συνήθως http://localhost:5173)
+├── package.json              # root scripts; concurrently runs API + UI
+├── backend/
+│   ├── server.js             # HTTP API, sync, validation routes
+│   ├── config.js             # env → config (see for variable names)
+│   ├── fetchers/             # per-network clients
+│   ├── normalization/        # raw payload → canonical transaction shape
+│   ├── db/                   # schema + queries
+│   ├── scripts/              # e.g. scheduler
+│   └── .env                  # local only — never committed
+└── frontend/
+    └── src/                  # Vue app (Vite dev server, typically :5173)
 ```
 
 ---
 
-## Προαπαιτούμενα
+## Prerequisites
 
-- [Node.js](https://nodejs.org/) **18 ή νεότερο** (LTS συνιστάται)
-- npm (έρχεται με Node)
-- Για CJ με Playwright: `npm run playwright:install --prefix backend` (μία φορά)
+- **Node.js** 18 or newer (LTS recommended)
+- **npm**
+- For CJ browser automation: `npm run playwright:install --prefix backend` once
 
 ---
 
-## Εγκατάσταση & τρέξιμο (τοπικά)
+## Local setup
 
 ```bash
 cd affiliate-tool-node-vue
-
-# Root (concurrently)
 npm install
-
-# Backend
 npm install --prefix backend
-
-# Frontend
 npm install --prefix frontend
 ```
 
-Δημιούργησε `backend/.env` από το παράδειγμα της ομάδας σου (χωρίς πραγματικά secrets στο git). Ελέγξε τουλάχιστον:
+### Environment
 
-- `SECRET_KEY` — σταθερό κλειδί για κρυπτογράφηση αποθηκευμένων API keys στη βάση
-- Μεταβλητές ανά δίκτυο (AWIN, CJ, Impact, Webgains) όπως ορίζει το `backend/config.js`
-- Προαιρετικό **Webgains**: `WEBGAINS_FORCE_ROW_CURRENCY=DKK` στο `backend/.env` — μετά το sync, το πεδίο `currency` στη βάση γίνεται πάντα DKK (όταν το report σου είναι DKK-scoped αλλά μερικά raw rows έχουν `EUR`). Τα ποσά παραμένουν με minor→major βάσει του ISO που διαβάζουμε από `value`/`commission`. Χρειάζεται **ξανά sync** για τις υπάρχουσες γραμμές.
+Create **`backend/.env`** locally (see `backend/config.js` for every key). Minimum:
 
-Έναρξη dev (backend + frontend):
+- **`SECRET_KEY`** — drives encryption of stored merchant credentials.
+- Network credentials and IDs as required by each integration (AWIN, CJ, Impact, Webgains).
+
+Optional for Webgains: **`WEBGAINS_FORCE_ROW_CURRENCY=DKK`** — after sync, the stored `currency` column is normalised to DKK when mixed ISO tags appear on otherwise DKK-scoped reports; numeric conversion still follows each field’s ISO for minor→major. **Re-sync** applies it to existing rows.
+
+Never commit `.env`, database files, or session stores; they are listed in `.gitignore`.
+
+### Run (development)
 
 ```bash
 npm run dev
-# ή ισοδύναμα:
+# equivalent:
 npm run dev:stable
 ```
 
-- Frontend: συνήθως **http://localhost:5173**
-- Backend API: όπως ορίζεται στο `backend/server.js` (συνήθως port **3000** ή αντίστοιχο στο project)
+- **Frontend:** `http://localhost:5173` (typical)
+- **Backend:** port from `backend/server.js` (often **5001**; Vite proxy should match)
 
-Health check: `GET /api/health`
+Smoke test: `GET /api/health`
 
-Production build frontend:
+### Production build (frontend only)
 
 ```bash
 npm run build --prefix frontend
@@ -98,58 +106,16 @@ npm run build --prefix frontend
 
 ---
 
-## Πώς να το ανεβάσεις στο GitHub
+## Security
 
-### 1. Δημιούργησε κενό repository στο GitHub
-
-- GitHub → **New repository**
-- Όνομα π.χ. `affiliate-merchant-tool`
-- **Μην** προσθέσεις README / .gitignore / license από το UI αν θα κάνεις `git init` τοπικά με δικό σου README (για να μην έχεις conflict)· αλλιώς κάνε merge μετά.
-
-### 2. Στον υπολογιστή σου (μέσα στο φάκελο του project)
-
-```bash
-cd "path/to/affiliate-tool-node-vue"
-
-git init
-git add .
-git status   # έλεγξε ότι ΔΕΝ εμφανίζεται .env ούτε *.db ούτε node_modules
-git commit -m "Initial commit: affiliate merchant tool (Vue + Node)"
-git branch -M main
-git remote add origin https://github.com/ΤΟ_USERNAME_SOU/affiliate-merchant-tool.git
-git push -u origin main
-```
-
-Αν χρησιμοποιείς **SSH**:
-
-```bash
-git remote add origin git@github.com:ΤΟ_USERNAME_SOU/affiliate-merchant-tool.git
-git push -u origin main
-```
-
-### 3. Αν ζητήσει login
-
-- HTTPS: personal access token (GitHub → Settings → Developer settings → Fine-grained ή classic token) αντί για κωδικό.
-- Ή εγκατάσταση [GitHub CLI](https://cli.github.com/) (`gh auth login`).
-
-### 4. Αν το repository υπάρχει ήδη με README από το GitHub
-
-```bash
-git pull origin main --allow-unrelated-histories
-# λύσε τυχόν conflicts, μετά:
-git push -u origin main
-```
+Do not push secrets. If you clone this repo, supply your own `.env` and generate your own `SECRET_KEY`. The application is intended for environments you control.
 
 ---
 
-## Αδειοδότηση / ιδιοκτησία
+## License
 
-Ο κώδικας αναπτύχθηκε για **εσωτερική χρήση** στην εταιρεία μου. Αν το repo είναι **private**, καλύπτεσαι για εσωτερική ανάπτυξη· για **public** repo πρόσθεσε άδεια (LICENSE) και έλεγξε με τη νομική/HR αν επιτρέπεται δημοσίευση.
+Written for **internal / portfolio** use. Public hosting is at your discretion; add an explicit **LICENSE** file if you need a standard open-source terms.
 
 ---
 
-## Συντηρητής
-
-Αναπτύχθηκε και συντηρείται από **[Manos lyrantzakis]** για λογαριασμό της εταιρείας.
-
-*(Ενημέρωσε την παραπάνω γραμμή και το URL του remote όταν το στήσεις.)*
+**Manos Lyrantzakis** — design, implementation, and maintenance.
